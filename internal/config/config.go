@@ -10,7 +10,7 @@ var Config Configuration
 // Configuration settings of the service.
 type Configuration struct {
 	// Host --> Default 0.0.0.0
-	Host string `mapstructure:"HOST" json:"host" default:"127.0.0.1"`
+	Host string `mapstructure:"HOST" json:"host" default:"0.0.0.0"`
 	// Port --> Default 49100
 	Port string `mapstructure:"PORT" json:"port" default:"3100"`
 	// DBName --> Name of the database. Default "amc.db"
@@ -18,11 +18,7 @@ type Configuration struct {
 }
 
 func LoadConfiguration() error {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	err = godotenv.Load(pwd + "/internal/config/.env")
+	err := godotenv.Load("./internal/config/.env")
 	if err != nil {
 		return err
 	}

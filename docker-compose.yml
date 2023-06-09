@@ -10,3 +10,7 @@ services:
     restart: unless-stopped
     ports:
       - "3100:3100"
+    environment:
+      - HOST:127.0.0.1
+      - PORT:3100
+      - DB_NAME:/amc.db
