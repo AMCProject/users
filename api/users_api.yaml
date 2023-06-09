@@ -1,0 +1,230 @@
+openapi: 3.0.3
+info:
+  title: Users API
+  description: Users OpenAPI endpoints
+  version: 1.0.0
+servers:
+  - url: http://127.0.0.1:3100
+    description: Local
+tags:
+  - name: Login
+    description: Login Operation
+  - name: Users
+    description: Operations about Users
+paths:
+  /login:
+    post:
+      tags:
+        - Login
+      summary: Login
+      operationId: Login
+      requestBody:
+        description: 'Body of a login'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+        required: true
+      responses:
+          200:
+            description: OK
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/UserResponse'
+          400:
+            $ref: '#/components/responses/BadRequest'
+          404:
+            $ref: '#/components/responses/NotFound'
+          500:
+            $ref: '#/components/responses/ServerError'
+  /user:
+    post:
+      tags:
+        - Users
+      summary: Create a new User
+      operationId: CreateUser
+      requestBody:
+        description: 'Body of new User'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+        409:
+          $ref: '#/components/responses/Conflict'
+        500:
+          $ref: '#/components/responses/ServerError'
+
+  /user/{id}:
+    parameters:
+      - $ref: '#/components/parameters/userId'
+    get:
+      tags:
+        - Users
+      summary: Get User Information
+      operationId: GetUser
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+        500:
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags:
+        - Users
+      summary: Update User Information
+      operationId: PutUser
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+        500:
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags:
+        - Users
+      summary: Delete User
+      operationId: DeleteUser
+      responses:
+        204:
+          description: The user was deleted successfully.
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+        500:
+          $ref: '#/components/responses/ServerError'
+
+components:
+  schemas:
+    Login:
+      title: Login Request
+      required:
+        - mail
+        - password
+      type: object
+      properties:
+        mail:
+          type: string
+          pattern: '^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$'
+          example: amc@amcgroup.com
+        password:
+          type: string
+          pattern: '(?=^.{8,}$)((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$'
+          example: MyPassword.123
+    UserRequest:
+      title: User Request
+      type: object
+      properties:
+        name:
+          type: string
+          example: amc
+        mail:
+          type: string
+          example: amc@amcgroup.com
+        password:
+          type: string
+          example: MyPassword.123
+    UserResponse:
+      title: User Response
+      type: object
+      properties:
+        id:
+          type: string
+          example: 01H00Q44V18CKXHMY7FEJ2876S
+        name:
+          type: string
+          example: amc
+        mail:
+          type: string
+          example: amc@amcgroup.com
+    ErrorResponse:
+      title: Error Response
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            status:
+              type: integer
+              format: int64
+              example: 400
+            message:
+              type: string
+              example: invalid id
+
+  parameters:
+    userId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        example: 01H00Q44V18CKXHMY7FEJ2876S
+  responses:
+    BadRequest:
+      description: Payload format error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              status: 400
+              message: malformed body
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              status: 404
+              message: Not found
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              status: 409
+              message: Conflict
+    ServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              status: 500
+              message: Internal Server Error

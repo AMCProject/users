@@ -1,0 +1,12 @@
+version: '3.7'
+
+services:
+  amc_user:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: amc_user
+    init: true
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
