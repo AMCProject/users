@@ -1,10 +1,12 @@
-package internal
+package repositories
 
 import (
 	"github.com/labstack/gommon/log"
 	"github.com/oklog/ulid/v2"
 	"math/rand"
 	"time"
+	"users/internal"
+	"users/internal/models"
 	"users/pkg/database"
 )
 
@@ -21,10 +23,10 @@ type SQLiteUserRepository struct {
 }
 
 type UserRepository interface {
-	GetUser(id string) (*User, error)
-	GetUserByMail(mail string) (*User, error)
-	UpdateUser(user *User) error
-	CreateUser(user *User) error
+	GetUser(id string) (*models.User, error)
+	GetUserByMail(mail string) (*models.User, error)
+	UpdateUser(user *models.User) error
+	CreateUser(user *models.User) error
 	DeleteUser(id string) error
 }
 
@@ -34,48 +36,48 @@ func NewSQLiteUserRepository(db *database.Database) *SQLiteUserRepository {
 	}
 }
 
-func (r *SQLiteUserRepository) GetUser(id string) (user *User, err error) {
-	var usersAux []User
+func (r *SQLiteUserRepository) GetUser(id string) (user *models.User, err error) {
+	var usersAux []models.User
 
 	if err = r.db.Conn.Select(&usersAux, getUser, id); err != nil {
 		log.Error(err)
-		return user, ErrSomethingWentWrong
+		return user, internal.ErrSomethingWentWrong
 	}
 	if len(usersAux) == 0 {
-		return user, ErrUserNotFound
+		return user, internal.ErrUserNotFound
 	}
 
 	return &usersAux[0], nil
 }
 
-func (r *SQLiteUserRepository) GetUserByMail(mail string) (user *User, err error) {
-	var usersAux []User
+func (r *SQLiteUserRepository) GetUserByMail(mail string) (user *models.User, err error) {
+	var usersAux []models.User
 
 	if err = r.db.Conn.Select(&usersAux, getUserMail, mail); err != nil {
 		log.Error(err)
-		return user, ErrSomethingWentWrong
+		return user, internal.ErrSomethingWentWrong
 	}
 
 	if len(usersAux) == 0 {
-		return user, ErrUserNotFound
+		return user, internal.ErrUserNotFound
 	}
 	return &usersAux[0], nil
 }
 
-func (r *SQLiteUserRepository) UpdateUser(id string, user *User) (err error) {
+func (r *SQLiteUserRepository) UpdateUser(id string, user *models.User) (err error) {
 	if _, err = r.db.Conn.Exec(updateUser, user.Name, user.Mail, user.Password, id); err != nil {
 		log.Error(err)
-		return ErrSomethingWentWrong
+		return internal.ErrSomethingWentWrong
 	}
 	return
 }
 
-func (r *SQLiteUserRepository) CreateUser(user *User) (err error) {
+func (r *SQLiteUserRepository) CreateUser(user *models.User) (err error) {
 
 	id, _ := ulid.New(ulid.Now(), ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0))
 	if _, err = r.db.Conn.Exec(createUser, id.String(), user.Name, user.Mail, user.Password); err != nil {
 		log.Error(err)
-		return ErrSomethingWentWrong
+		return internal.ErrSomethingWentWrong
 	}
 	return
 }
@@ -84,7 +86,7 @@ func (r *SQLiteUserRepository) DeleteUser(id string) (err error) {
 
 	if _, err = r.db.Conn.Exec(deleteUser, id); err != nil {
 		log.Error(err)
-		return ErrSomethingWentWrong
+		return internal.ErrSomethingWentWrong
 	}
 	return
 }

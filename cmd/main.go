@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"users/internal"
 	"users/internal/config"
+	"users/internal/handlers"
+	"users/internal/managers"
 	"users/pkg/database"
 )
 
@@ -52,9 +54,9 @@ func setUpServer(db *database.Database) *echo.Echo {
 
 func addRoutes(e *echo.Echo, db database.Database) {
 
-	userManager := internal.NewUserManager(db)
+	userManager := managers.NewUserManager(db)
 
-	userAPI := internal.UserAPI{DB: db, Manager: userManager}
+	userAPI := handlers.UserAPI{DB: db, Manager: userManager}
 	e.POST(internal.RouteLogin, userAPI.Login)
 	e.POST(internal.RouteUser, userAPI.PostUserHandler)
 	e.GET(internal.RouteUserID, userAPI.GetUserHandler)

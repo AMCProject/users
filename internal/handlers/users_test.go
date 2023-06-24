@@ -1,4 +1,4 @@
-package internal
+package handlers
 
 import (
 	"bytes"
@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"users/internal"
+	"users/internal/managers"
+	"users/internal/models"
 	"users/pkg/database"
 )
 
@@ -26,8 +29,8 @@ func TestUserAPITestSuite(t *testing.T) {
 func (s *UserAPITestSuite) SetupTest() {
 	_ = database.RemoveDB(databaseTest)
 	s.db = database.InitDB(databaseTest)
-	password, _ := hashPassword("MyPassword.123")
-	s.db.Conn.Exec(createUser, "01FN3EEB2NVFJAHAPU00000001", "firstuser", "firstuser@mail.com", password)
+	password, _ := managers.HashPassword("MyPassword.123")
+	s.db.Conn.Exec("INSERT INTO users(id,name,mail,password) VALUES (?,?,?,?)", "01FN3EEB2NVFJAHAPU00000001", "firstuser", "firstuser@mail.com", password)
 }
 
 func (s *UserAPITestSuite) TearDownTest() {
@@ -44,11 +47,11 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 	}{
 		{
 			name: "[001] Login user (ok)",
-			reqBody: &User{
+			reqBody: &models.User{
 				Mail:     "firstuser@mail.com",
 				Password: "MyPassword.123",
 			},
-			expectedResp: &User{
+			expectedResp: &models.User{
 				Id:       "01FN3EEB2NVFJAHAPU00000001",
 				Name:     PointerString("firstuser"),
 				Mail:     "firstuser@mail.com",
@@ -59,14 +62,14 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 		},
 		{
 			name: "[002] Login user not found (400)",
-			reqBody: &User{
+			reqBody: &models.User{
 				Mail:     "inventeduser@mail.com",
 				Password: "MyPassword2.123",
 			},
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusNotFound,
-					Message: ErrUserNotFound.Error(),
+					Message: internal.ErrUserNotFound.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusNotFound,
@@ -74,14 +77,14 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 		},
 		{
 			name: "[003] Wrong password (400)",
-			reqBody: &User{
+			reqBody: &models.User{
 				Mail:     "firstuser@mail.com",
 				Password: "MyPassword2.123",
 			},
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrWrongPassword.Error(),
+					Message: internal.ErrWrongPassword.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -90,10 +93,10 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 		{
 			name:    "[004] Wrong struct sent (400)",
 			reqBody: "invalid",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrWrongBody.Error(),
+					Message: internal.ErrWrongBody.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -105,7 +108,7 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 		body, err := jsoniter.Marshal(request)
 		s.NoError(err)
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodPost, RouteLogin, bytes.NewBuffer(body))
+		req := httptest.NewRequest(http.MethodPost, internal.RouteLogin, bytes.NewBuffer(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -113,7 +116,7 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 	}
 	for _, t := range tests {
 		s.Run(t.name, func() {
-			userManager := NewUserManager(*s.db)
+			userManager := managers.NewUserManager(*s.db)
 			api := UserAPI{DB: *s.db, Manager: userManager}
 
 			c := getEchoContext(t.reqBody)
@@ -125,7 +128,7 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				errorReturned := new(ErrorResponse)
+				errorReturned := new(internal.ErrorResponse)
 				s.NoError(jsoniter.Unmarshal(body, errorReturned))
 				s.Equal(errorReturned, t.expectedResp)
 			} else {
@@ -133,7 +136,7 @@ func (s *UserAPITestSuite) TestLoginHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				actualUser := new(User)
+				actualUser := new(models.User)
 				s.NoError(jsoniter.Unmarshal(body, actualUser))
 				s.Equal(actualUser, t.expectedResp)
 			}
@@ -154,12 +157,12 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 	}{
 		{
 			name: "[001] Create new user (ok)",
-			reqBody: &User{
+			reqBody: &models.User{
 				Mail:     "test1@testmail.com",
 				Password: "MyPassword.123",
 			},
 			expectedULID: ulid.MustParse("01FN3EEB2NVFJAHAPVXGDKHXG9"),
-			expectedResp: &User{
+			expectedResp: &models.User{
 				Id:       "01FN3EEB2NVFJAHAPVXGDKHXG9",
 				Name:     PointerString("test1"),
 				Mail:     "test1@testmail.com",
@@ -170,14 +173,14 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 		},
 		{
 			name: "[002] Create duplicated user (409)",
-			reqBody: &User{
+			reqBody: &models.User{
 				Mail:     "test1@testmail.com",
 				Password: "MyPassword2.123",
 			},
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusConflict,
-					Message: ErrUserAlreadyExists.Error(),
+					Message: internal.ErrUserAlreadyExists.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusConflict,
@@ -185,13 +188,13 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 		},
 		{
 			name: "[003] Wrong user struct, mail is missing (400)",
-			reqBody: &User{
+			reqBody: &models.User{
 				Password: "MyPassword2.123",
 			},
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrWrongBody.Error(),
+					Message: internal.ErrWrongBody.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -200,10 +203,10 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 		{
 			name:    "[004] Wrong struct sent (400)",
 			reqBody: "invalid",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrWrongBody.Error(),
+					Message: internal.ErrWrongBody.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -215,7 +218,7 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 		body, err := jsoniter.Marshal(request)
 		s.NoError(err)
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodPost, RouteUser, bytes.NewBuffer(body))
+		req := httptest.NewRequest(http.MethodPost, internal.RouteUser, bytes.NewBuffer(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
@@ -223,7 +226,7 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 	}
 	for _, t := range tests {
 		s.Run(t.name, func() {
-			userManager := NewUserManager(*s.db)
+			userManager := managers.NewUserManager(*s.db)
 			api := UserAPI{DB: *s.db, Manager: userManager}
 
 			c := getEchoContext(t.reqBody)
@@ -235,7 +238,7 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				errorReturned := new(ErrorResponse)
+				errorReturned := new(internal.ErrorResponse)
 				s.NoError(jsoniter.Unmarshal(body, errorReturned))
 				s.Equal(errorReturned, t.expectedResp)
 			} else {
@@ -243,7 +246,7 @@ func (s *UserAPITestSuite) TestPostUserHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				actualUser := new(User)
+				actualUser := new(models.User)
 				s.NoError(jsoniter.Unmarshal(body, actualUser))
 				actualUser.Id = t.expectedULID.String()
 				s.Equal(actualUser, t.expectedResp)
@@ -265,7 +268,7 @@ func (s *UserAPITestSuite) TestGetUserHandler() {
 		{
 			name:   "[001] Get user (ok)",
 			userID: "01FN3EEB2NVFJAHAPU00000001",
-			expectedResp: &User{
+			expectedResp: &models.User{
 				Id:       "01FN3EEB2NVFJAHAPU00000001",
 				Name:     PointerString("firstuser"),
 				Mail:     "firstuser@mail.com",
@@ -276,10 +279,10 @@ func (s *UserAPITestSuite) TestGetUserHandler() {
 		},
 		{
 			name: "[002] Get user, userId not indicated (400)",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrUserIDNotPresent.Error(),
+					Message: internal.ErrUserIDNotPresent.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -288,10 +291,10 @@ func (s *UserAPITestSuite) TestGetUserHandler() {
 		{
 			name:   "[003] User does not exist (404)",
 			userID: "01FN3EEB2NVFJAHAPU00000099",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusNotFound,
-					Message: ErrUserNotFound.Error(),
+					Message: internal.ErrUserNotFound.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusNotFound,
@@ -300,17 +303,17 @@ func (s *UserAPITestSuite) TestGetUserHandler() {
 	}
 	getEchoContext := func(userId string) echo.Context {
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodGet, RouteUserID, nil)
+		req := httptest.NewRequest(http.MethodGet, internal.RouteUserID, nil)
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames(ParamUserID)
+		c.SetParamNames(internal.ParamUserID)
 		c.SetParamValues(userId)
 		return c
 	}
 	for _, t := range tests {
 		s.Run(t.name, func() {
-			userManager := NewUserManager(*s.db)
+			userManager := managers.NewUserManager(*s.db)
 			api := UserAPI{DB: *s.db, Manager: userManager}
 
 			c := getEchoContext(t.userID)
@@ -322,7 +325,7 @@ func (s *UserAPITestSuite) TestGetUserHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				errorReturned := new(ErrorResponse)
+				errorReturned := new(internal.ErrorResponse)
 				s.NoError(jsoniter.Unmarshal(body, errorReturned))
 				s.Equal(errorReturned, t.expectedResp)
 			} else {
@@ -330,7 +333,7 @@ func (s *UserAPITestSuite) TestGetUserHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				actualUser := new(User)
+				actualUser := new(models.User)
 				s.NoError(jsoniter.Unmarshal(body, actualUser))
 				s.Equal(actualUser, t.expectedResp)
 			}
@@ -352,13 +355,13 @@ func (s *UserAPITestSuite) TestPutUserHandler() {
 		{
 			name:   "[001] Update user name (ok)",
 			userID: "01FN3EEB2NVFJAHAPU00000001",
-			reqBody: &User{
+			reqBody: &models.User{
 				Id:       "01FN3EEB2NVFJAHAPU00000001",
 				Name:     PointerString("michael"),
 				Mail:     "firstuser@mail.com",
 				Password: "MyPassword.123",
 			},
-			expectedResp: &User{
+			expectedResp: &models.User{
 				Id:       "01FN3EEB2NVFJAHAPU00000001",
 				Name:     PointerString("michael"),
 				Mail:     "firstuser@mail.com",
@@ -370,15 +373,15 @@ func (s *UserAPITestSuite) TestPutUserHandler() {
 		{
 			name:   "[002] Update user that does not exists (404)",
 			userID: "01FN3EEB2NVFJAHAPU00000099",
-			reqBody: &User{
+			reqBody: &models.User{
 				Name:     PointerString("invent"),
 				Mail:     "inventuser@mail.com",
 				Password: "MyPassword.123",
 			},
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusNotFound,
-					Message: ErrUserNotFound.Error(),
+					Message: internal.ErrUserNotFound.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusNotFound,
@@ -386,10 +389,10 @@ func (s *UserAPITestSuite) TestPutUserHandler() {
 		},
 		{
 			name: "[003] User id not indicated (400)",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrUserIDNotPresent.Error(),
+					Message: internal.ErrUserIDNotPresent.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -399,10 +402,10 @@ func (s *UserAPITestSuite) TestPutUserHandler() {
 			name:    "[004] Wrong struct sent (400)",
 			userID:  "01FN3EEB2NVFJAHAPU00000001",
 			reqBody: "invalid",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrWrongBody.Error(),
+					Message: internal.ErrWrongBody.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -414,17 +417,17 @@ func (s *UserAPITestSuite) TestPutUserHandler() {
 		body, err := jsoniter.Marshal(request)
 		s.NoError(err)
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodPut, RouteUserID, bytes.NewBuffer(body))
+		req := httptest.NewRequest(http.MethodPut, internal.RouteUserID, bytes.NewBuffer(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames(ParamUserID)
+		c.SetParamNames(internal.ParamUserID)
 		c.SetParamValues(userId)
 		return c
 	}
 	for _, t := range tests {
 		s.Run(t.name, func() {
-			userManager := NewUserManager(*s.db)
+			userManager := managers.NewUserManager(*s.db)
 			api := UserAPI{DB: *s.db, Manager: userManager}
 
 			c := getEchoContext(t.userID, t.reqBody)
@@ -436,7 +439,7 @@ func (s *UserAPITestSuite) TestPutUserHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				errorReturned := new(ErrorResponse)
+				errorReturned := new(internal.ErrorResponse)
 				s.NoError(jsoniter.Unmarshal(body, errorReturned))
 				s.Equal(errorReturned, t.expectedResp)
 			} else {
@@ -444,7 +447,7 @@ func (s *UserAPITestSuite) TestPutUserHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				actualUser := new(User)
+				actualUser := new(models.User)
 				s.NoError(jsoniter.Unmarshal(body, actualUser))
 				s.Equal(actualUser, t.expectedResp)
 			}
@@ -471,10 +474,10 @@ func (s *UserAPITestSuite) TestDeleteUserHandler() {
 		{
 			name:   "[002] Delete user that does not exists (404)",
 			userId: "01FN3EEB2NVFJAHAPU00000099",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusNotFound,
-					Message: ErrUserNotFound.Error(),
+					Message: internal.ErrUserNotFound.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusNotFound,
@@ -482,10 +485,10 @@ func (s *UserAPITestSuite) TestDeleteUserHandler() {
 		},
 		{
 			name: "[003] User id not indicated (400)",
-			expectedResp: &ErrorResponse{
-				Err: ErrorBody{
+			expectedResp: &internal.ErrorResponse{
+				Err: internal.ErrorBody{
 					Status:  http.StatusBadRequest,
-					Message: ErrUserIDNotPresent.Error(),
+					Message: internal.ErrUserIDNotPresent.Error(),
 				},
 			},
 			expectedStatusCode: http.StatusBadRequest,
@@ -494,17 +497,17 @@ func (s *UserAPITestSuite) TestDeleteUserHandler() {
 	}
 	getEchoContext := func(userId string) echo.Context {
 		e := echo.New()
-		req := httptest.NewRequest(http.MethodDelete, RouteUserID, nil)
+		req := httptest.NewRequest(http.MethodDelete, internal.RouteUserID, nil)
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
-		c.SetParamNames(ParamUserID)
+		c.SetParamNames(internal.ParamUserID)
 		c.SetParamValues(userId)
 		return c
 	}
 	for _, t := range tests {
 		s.Run(t.name, func() {
-			userManager := NewUserManager(*s.db)
+			userManager := managers.NewUserManager(*s.db)
 			api := UserAPI{DB: *s.db, Manager: userManager}
 
 			c := getEchoContext(t.userId)
@@ -516,7 +519,7 @@ func (s *UserAPITestSuite) TestDeleteUserHandler() {
 				s.True(ok)
 				body := resp.Body.Bytes()
 
-				errorReturned := new(ErrorResponse)
+				errorReturned := new(internal.ErrorResponse)
 				s.NoError(jsoniter.Unmarshal(body, errorReturned))
 				s.Equal(errorReturned, t.expectedResp)
 			}
