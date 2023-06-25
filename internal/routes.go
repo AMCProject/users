@@ -46,11 +46,11 @@ var errorsMap = map[string]ErrorBody{
 	ErrSomethingWentWrong.Error(): {Status: http.StatusInternalServerError, Message: ErrSomethingWentWrong.Error()},
 }
 var (
-	ErrUserIDNotPresent   = errors.New("error with ID given")
-	ErrSomethingWentWrong = errors.New("something went wrong")
-	ErrUserAlreadyExists  = errors.New("user already exists")
-	ErrWrongBody          = errors.New("malformed body")
-	ErrUserNotFound       = errors.New("user not found")
-	ErrHashingPassword    = errors.New("error with user")
-	ErrWrongPassword      = errors.New("wrong password given")
+	ErrUserIDNotPresent   = errors.New("error con el ID del usuario dado")
+	ErrSomethingWentWrong = errors.New("error inesperado")
+	ErrUserAlreadyExists  = errors.New("este usuario ya existe")
+	ErrWrongBody          = errors.New("el cuerpo enviado es erróneo")
+	ErrUserNotFound       = errors.New("usuario no encontrado")
+	ErrHashingPassword    = errors.New("error encriptando la contraseña")
+	ErrWrongPassword      = errors.New("contraseña errónea")
 )
