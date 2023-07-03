@@ -3,7 +3,7 @@ package database
 import (
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/gommon/log"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,6 +16,7 @@ type Database struct {
 func InitDB(bbddName string) *Database {
 	var err error
 	db := &Database{}
+
 	db.Conn, err = SqlLiteConnect(bbddName)
 
 	if err != nil {
@@ -29,8 +30,7 @@ func InitDB(bbddName string) *Database {
 
 func SqlLiteConnect(bbddName string) (*sqlx.DB, error) {
 	dir, _ := os.Getwd()
-	db, err := sqlx.Connect("sqlite3", filepath.Dir(dir)+bbddName)
-
+	db, err := sqlx.Connect("sqlite", filepath.Dir(dir)+bbddName)
 	numbSc, err := GetDBVersion(db)
 	if numbSc < len(scripts)-1 {
 		err = CreateScripts(db, numbSc)
@@ -38,6 +38,7 @@ func SqlLiteConnect(bbddName string) (*sqlx.DB, error) {
 			return db, err
 		}
 	}
+
 	log.Info("Database version :", len(scripts))
 
 	db.SetMaxOpenConns(3)
